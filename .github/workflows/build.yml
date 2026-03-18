@@ -7,8 +7,8 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
-    timeout-minutes: 90
+    runs-on: ubuntu-20.04
+    timeout-minutes: 120
 
     steps:
     - name: Descargar código
@@ -20,7 +20,7 @@ jobs:
         java-version: '17'
         distribution: temurin
 
-    - name: Instalar dependencias
+    - name: Instalar dependencias del sistema
       run: |
         sudo apt-get update -qq
         sudo apt-get install -y \
@@ -29,30 +29,44 @@ jobs:
           libffi-dev libssl-dev \
           libsdl2-dev libsdl2-image-dev \
           libsdl2-mixer-dev libsdl2-ttf-dev \
-          autoconf automake libtool ccache
-        pip3 install --upgrade buildozer cython==0.29.36
+          libportmidi-dev libswscale-dev \
+          libavformat-dev libavcodec-dev \
+          zlib1g-dev autoconf automake \
+          libtool pkg-config ccache
 
-    - name: Cache Android SDK
+    - name: Instalar Python tools
+      run: |
+        pip3 install --upgrade pip
+        pip3 install --upgrade \
+          buildozer==1.5.0 \
+          cython==0.29.36 \
+          virtualenv
+
+    - name: Cache Android SDK y NDK
       uses: actions/cache@v4
       with:
         path: |
           ~/.buildozer
           ~/.android
-        key: buildozer-${{ hashFiles('buildozer.spec') }}
-        restore-keys: buildozer-
+        key: buildozer-v2-${{ hashFiles('buildozer.spec') }}
+        restore-keys: |
+          buildozer-v2-
 
-    - name: Aceptar licencias Android
+    - name: Preparar Android SDK
       run: |
         mkdir -p ~/.android
         echo "count=0" > ~/.android/repositories.cfg
-        yes | sdkmanager --licenses 2>/dev/null || true
+        touch ~/.android/repositories.cfg
 
     - name: Compilar APK
       run: |
         export PATH=$PATH:~/.local/bin
-        buildozer android debug 2>&1
+        export ANDROIDSDK=$HOME/.buildozer/android/platform/android-sdk
+        buildozer -v android debug 2>&1
+      env:
+        JAVA_HOME: /usr/lib/jvm/temurin-17-amd64
 
-    - name: Guardar APK descargable
+    - name: Guardar APK
       uses: actions/upload-artifact@v4
       with:
         name: PhoneBoosterPro-APK
